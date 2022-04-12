@@ -25,6 +25,8 @@ entity NeoPixelController is
 		cs_poop   : in   std_logic ;
 		cs_pee    : in   std_logic ;
 		cs_DEF	 : in   std_logic ;
+		cs_CADDR  : in   std_logic ;
+		cs_CCOLOR : in   std_logic ;
 		data_in   : in   std_logic_vector(15 downto 0);
 		sda       : out  std_logic
 	); 
@@ -35,6 +37,10 @@ architecture internals of NeoPixelController is
 	
 	-- Signals for the RAM read and write addresses
 	signal ram_read_addr, ram_write_addr : std_logic_vector(7 downto 0);
+	signal custom_addr1 : std_logic_vector(7 downto 0);
+	signal custom_addr2 : std_logic_vector(7 downto 0);
+	signal custom_addr3 : std_logic_vector(7 downto 0);
+	
 	signal color_change : std_logic_vector(11 downto 0);
 	-- RAM write enable
 	signal ram_we : std_logic;
@@ -49,6 +55,9 @@ architecture internals of NeoPixelController is
 	-- Signal SCOMP will write to before it gets stored into memory
 	signal ram_write_buffer : std_logic_vector(23 downto 0);
 	signal buffer_write_buffer : std_logic_vector(23 downto 0);
+	signal custm_color1 : std_logic_vector(23 downto 0);
+	signal custm_color2 : std_logic_vector(23 downto 0);
+	signal custm_color3 : std_logic_vector(23 downto 0);
 	-- RAM interface state machine signals
 	type write_states is (idle, custom_storing, custom_color, default, storing);
 	signal wstate: write_states;
@@ -211,6 +220,11 @@ begin
 	
 	
 	process(clk_10M, resetn, cs_addr)
+	
+		variable addr_count   : integer range 0 to 3;
+		variable color_count   : integer range 0 to 31;
+		
+		
 	begin
 		-- For this implementation, saving the memory address
 		-- doesn't require anything special.  Just latch it when
@@ -230,6 +244,8 @@ begin
 		if resetn = '0' then
 			wstate <= idle;
 			ram_we <= '0';
+			addr_count := 0;
+			color_count := 0;
 			ram_write_buffer <= x"000000";
 			buffer_write_buffer <= x"000000";
 			
@@ -255,22 +271,23 @@ begin
 					buffer_write_buffer <= x"000011";
 					wstate <= idle;
 				elsif (io_write = '1') and (cs_poop = '1') then
-					wstate <= custom_storing;
+					ram_write_addr <= data_in(7 downto 0);
+					wstate <= idle;
 				elsif (io_write = '1') and (cs_pee = '1') then
+					ram_write_buffer <= data_in(10 downto 5) & "00" & data_in(15 downto 11) & "000" & data_in(4 downto 0) & "000";
+					buffer_or_ram <= '1';
+					ram_we <= '1';
+					wstate <= storing;
+				elsif (io_write = '1') and (cs_CADDR = '1') then
+					wstate <= custom_storing;
+				elsif (io_write = '1') and (cs_CCOLOR = '1') then
 					wstate <= custom_color;
 				end if;
 					
 			when custom_storing =>
-				ram_write_addr <= data_in(7 downto 0);
-				wstate <= idle;
 				
 			when custom_color =>
-				ram_write_buffer <= data_in(10 downto 5) & "00" & data_in(15 downto 11) & "000" & data_in(4 downto 0) & "000";
-				buffer_or_ram <= '1';
-				ram_we <= '1';
-				wstate <= storing;
-				
-				
+			
 			when storing =>
 				-- All that's needed here is to lower ram_we.  The RAM will be
 				-- storing data on this clock edge, so ram_we can go low at the

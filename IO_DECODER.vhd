@@ -21,7 +21,10 @@ ENTITY IO_DECODER IS
     PXL_D_EN      : OUT STD_LOGIC;
 	 PXL_DEF			: OUT STD_LOGIC;
 	 PXL_USE			: OUT STD_LOGIC;
-	 PXL_ALL			: OUT STD_LOGIC
+	 PXL_ALL			: OUT STD_LOGIC;
+	 PXL_CADDR		: OUT STD_LOGIC;
+	 PXL_CCOLOR		: OUT STD_LOGIC
+	 
   );
 
 END ENTITY;
@@ -44,5 +47,7 @@ begin
   PXL_DEF      <= '1' WHEN (ADDR_INT = 16#0B2#) and (IO_CYCLE = '1') ELSE '0';
   PXL_USE      <= '1' WHEN (ADDR_INT = 16#0B3#) and (IO_CYCLE = '1') ELSE '0';
   PXL_ALL      <= '1' WHEN (ADDR_INT = 16#0B4#) and (IO_CYCLE = '1') ELSE '0';
+  PXL_CADDR    <= '1' WHEN (ADDR_INT = 16#0B5#) and (IO_CYCLE = '1') ELSE '0';
+  PXL_CCOLOR   <= '1' WHEN (ADDR_INT = 16#0B6#) and (IO_CYCLE = '1') ELSE '0';
       
 END a;
