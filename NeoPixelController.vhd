@@ -5,8 +5,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all; 
 use ieee.std_logic_unsigned.all;
-use ieee.std_logic_arith.all;
-use ieee.numeric_std.all;
+
 
 library altera_mf;
 use altera_mf.altera_mf_components.all;
@@ -44,7 +43,7 @@ architecture internals of NeoPixelController is
 	signal color_change : std_logic_vector(11 downto 0);
 	-- RAM write enable
 	signal ram_we : std_logic;
-	signal buffer_or_ram : std_logic;
+	
 
 	-- Signals for data coming out of memory
 	signal ram_read_data : std_logic_vector(23 downto 0);
@@ -61,7 +60,12 @@ architecture internals of NeoPixelController is
 	-- RAM interface state machine signals
 	type write_states is (idle, custom_storing, custom_color, default, storing);
 	signal wstate: write_states;
-
+	
+	type mode_states is (idle, auto_incrementing);
+	signal mstate: mode_states;
+	
+	type pixel_thing is array (256 downto 0) of std_logic;
+	signal buffer_or_ram : pixel_thing; 
 	
 begin
 
@@ -154,7 +158,7 @@ begin
 				-- decrement the reset count
 				reset_count := reset_count - 1;
 				-- load data from memory
-				if buffer_or_ram = '0' then
+				if buffer_or_ram(to_integer(unsigned(ram_write_addr))) = '0' then
 					pixel_buffer <= buffer_write_buffer;
 				else
 					pixel_buffer <= ram_read_data;
@@ -168,7 +172,7 @@ begin
 					pixel_buffer <= pixel_buffer(22 downto 0) & '0';
 					if bit_count = 0 then -- is end of this pixels's data?
 						bit_count := 23; -- start a new pixel
-						if buffer_or_ram = '0' then
+						if buffer_or_ram(pixel_count) = '0' then
 							pixel_buffer <= buffer_write_buffer;
 						else
 							pixel_buffer <= ram_read_data;
@@ -222,7 +226,7 @@ begin
 	process(clk_10M, resetn, cs_addr)
 	
 		variable addr_count   : integer range 0 to 3;
-		variable color_count   : integer range 0 to 31;
+		variable color_count   : integer range 0 to 3;
 		
 		
 	begin
@@ -248,6 +252,10 @@ begin
 			color_count := 0;
 			ram_write_buffer <= x"000000";
 			buffer_write_buffer <= x"000000";
+			buffer_or_ram <= (others => '0');
+			
+			addr_count := 0;
+			color_count := 0;
 			
 			-- Note that resetting this device does NOT clear the memory.
 			-- Clearing memory would require cycling through each address
@@ -267,17 +275,20 @@ begin
 					wstate <= storing;
 				end if;
 				if (io_write = '1') and (cs_DEF = '1') then
-					buffer_or_ram <= '0';
+					--WRITE A FOR LOOP TO SET EVERYTHING BACK TO THE BACKGROUND--
 					buffer_write_buffer <= x"000011";
+					ram_we <= '1';
 					wstate <= idle;
 				elsif (io_write = '1') and (cs_poop = '1') then
 					ram_write_addr <= data_in(7 downto 0);
 					wstate <= idle;
 				elsif (io_write = '1') and (cs_pee = '1') then
 					ram_write_buffer <= data_in(10 downto 5) & "00" & data_in(15 downto 11) & "000" & data_in(4 downto 0) & "000";
-					buffer_or_ram <= '1';
+					buffer_or_ram(to_integer(unsigned(ram_write_addr))) <= '1';
 					ram_we <= '1';
 					wstate <= storing;
+					
+					
 				elsif (io_write = '1') and (cs_CADDR = '1') then
 					wstate <= custom_storing;
 				elsif (io_write = '1') and (cs_CCOLOR = '1') then
